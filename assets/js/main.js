@@ -132,3 +132,41 @@ document.querySelectorAll('.carrossel').forEach(function (c) {
   document.addEventListener('visibilitychange', function () { document.hidden ? parar() : iniciar(); });
   iniciar();
 });
+
+// Eventos de conversão: pixel da Meta (carregado pela UTMify) + dataLayer
+(function () {
+  var fila = [];
+  function enviar(tipo, nome, dados) {
+    (window.dataLayer = window.dataLayer || []).push(Object.assign({ event: nome }, dados));
+    if (window.fbq) window.fbq(tipo, nome, dados);
+    else fila.push([tipo, nome, dados]);
+  }
+  // o pixel carrega assíncrono: esvazia a fila quando o fbq aparecer (até 10s)
+  var tentativas = 0;
+  var esperar = setInterval(function () {
+    if (window.fbq && fila.length) { fila.splice(0).forEach(function (f) { window.fbq(f[0], f[1], f[2]); }); }
+    if (window.fbq || ++tentativas > 40) clearInterval(esperar);
+  }, 250);
+
+  // Visualizou um produto (PV)
+  var produto = document.getElementById('dados-produto');
+  if (produto) {
+    enviar('track', 'ViewContent', { content_name: produto.dataset.produto, content_ids: [produto.dataset.slug], content_type: 'product', value: Number(produto.dataset.valor), currency: 'BRL' });
+  }
+
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest('a');
+    if (!a) return;
+    // Clicou em comprar (o InitiateCheckout oficial vem do postback da Lastlink na UTMify)
+    if (a.classList.contains('btn-compra')) {
+      enviar('trackCustom', 'CliqueComprar', { produto: a.dataset.produto, valor: Number(a.dataset.valor), pagina: location.pathname });
+    } else if (/wa\.me\//.test(a.href)) {
+      enviar('trackCustom', 'CliqueWhatsApp', { pagina: location.pathname });
+    }
+  });
+
+  // Inscrição na newsletter
+  document.querySelectorAll('form[name="newsletter"]').forEach(function (f) {
+    f.addEventListener('submit', function () { enviar('track', 'Lead', { content_name: 'newsletter', pagina: location.pathname }); });
+  });
+})();

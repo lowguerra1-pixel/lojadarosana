@@ -77,7 +77,7 @@ const capa = (p, r) => p.imagemCapa ? `<img src="${r}${p.imagemCapa}" alt="${esc
 
 const linkCompra = (p) => p.checkout || wa(`Olá! Quero garantir o ${p.nome}.`);
 const btnCompra = (p, texto = 'Quero o kit completo', cls = '') =>
-  `<a class="btn btn-compra ${cls}" href="${esc(linkCompra(p))}" ${p.checkout ? 'data-checkout' : 'target="_blank" rel="noopener"'}>${esc(texto)} ${ic('seta')}</a>`;
+  `<a class="btn btn-compra ${cls}" href="${esc(linkCompra(p))}" data-produto="${esc(p.nome)}" data-valor="${p.preco}" ${p.checkout ? 'data-checkout' : 'target="_blank" rel="noopener"'}>${esc(texto)} ${ic('seta')}</a>`;
 
 const cardProduto = (p, r) => `<a class="card-produto revelar" href="${r}produtos/${p.slug}/" data-cat="${esc(p.categoria)}">
   <div class="capa">${capa(p, r)}${p.selo ? `<span class="selo-card">${esc(p.selo)}</span>` : ''}</div>
@@ -201,6 +201,22 @@ const blocoSuporte = (r, titulo = 'Suporte humano, de verdade') => `<section cla
 // ---------------------------------------------------------------- layout
 const FONTES = 'https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,400..800,0..100,0..1;1,9..144,400..700,0..100,0..1&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap';
 
+// pixel + UTMs (UTMify). Configurado em content/config.mjs → rastreio
+// utms: false no link da bio — o script da UTMify reescreveria as UTMs fixas dos botões
+const rastreioHead = ({ utms = true } = {}) => {
+  const t = cfg.rastreio || {};
+  let h = '';
+  if (t.utmifyPixelId) h += `<script>window.pixelId=${JSON.stringify(t.utmifyPixelId)};var a=document.createElement("script");a.setAttribute("async","");a.setAttribute("defer","");a.setAttribute("src","https://cdn.utmify.com.br/scripts/pixel/pixel.js");document.head.appendChild(a);</script>\n`;
+  if (t.utmifyUtms && utms) h += `<script src="https://cdn.utmify.com.br/scripts/utms/latest.js" data-utmify-prevent-subids async defer></script>\n`;
+  return h;
+};
+// acrescenta UTMs a um link (mantém âncora #)
+const comUtm = (href, extra = {}) => {
+  const [base, ancora] = href.split('#');
+  const q = new URLSearchParams({ ...cfg.utmBio, ...extra }).toString();
+  return base + (base.includes('?') ? '&' : '?') + q + (ancora !== undefined ? '#' + ancora : '');
+};
+
 function layout({ r, caminho, titulo, descricao, corpo, ativo = '', imagem = '', jsonld = null, bodyClass = '' }) {
   const url = cfg.urlSite.replace(/\/$/, '') + '/' + caminho;
   const og = imagem ? cfg.urlSite.replace(/\/$/, '') + '/' + imagem : '';
@@ -230,7 +246,7 @@ ${og ? `<meta property="og:image" content="${og}">\n<meta name="twitter:card" co
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="${FONTES}">
 <link rel="stylesheet" href="${r}assets/css/style.css?v=${v}">
-${jsonld ? `<script type="application/ld+json">${JSON.stringify(jsonld)}</script>` : ''}
+${rastreioHead()}${jsonld ? `<script type="application/ld+json">${JSON.stringify(jsonld)}</script>` : ''}
 </head>
 <body class="${bodyClass}">
 <a class="sr-only" href="#conteudo">Pular para o conteúdo</a>
@@ -473,6 +489,7 @@ for (const p of produtos) {
   const postsRel = posts.filter((x) => x.produtoRelacionado === p.slug);
 
   const corpo = `
+<div hidden id="dados-produto" data-slug="${p.slug}" data-produto="${esc(p.nome)}" data-valor="${p.preco}"></div>
 <div class="container migalhas"><a href="${r}">Início</a><span>/</span><a href="${r}produtos/">Materiais</a><span>/</span>${esc(p.nomeCurto)}</div>
 
 <section class="pv-hero">
@@ -863,10 +880,10 @@ ${blocoSuporte(r, 'Ainda precisa de ajuda?')}`;
 {
   const r = '../';
   const links = [
-    { href: `${cfg.urlApp}/login`, titulo: 'Já comprei: acessar meus materiais', sub: 'Entrar no app da Oficina', icone: 'livro', cor: 'roxo', destaque: true },
-    { href: wa('Olá! Vim pelo Instagram e preciso de ajuda.'), titulo: 'Falar com o suporte', sub: `WhatsApp · ${cfg.horarioSuporte}`, icone: 'chat', cor: 'teal', externo: true },
-    { href: `${r}`, titulo: `Loja ${nomeMarca}`, sub: 'Kits terapêuticos prontos para usar', icone: 'presente', cor: 'coral' },
-    { href: `${r}#newsletter`, titulo: 'Receber dicas por e-mail', sub: 'Cartas da Oficina, toda semana', icone: 'email', cor: 'sol' },
+    { botao: 'acessar-materiais', href: comUtm(`${cfg.urlApp}/login`, { utm_content: 'acessar-materiais' }), titulo: 'Já comprei: acessar meus materiais', sub: 'Entrar no app da Oficina', icone: 'livro', cor: 'roxo', destaque: true },
+    { botao: 'suporte-whatsapp', href: wa('Olá! Vim pelo Instagram e preciso de ajuda.'), titulo: 'Falar com o suporte', sub: `WhatsApp · ${cfg.horarioSuporte}`, icone: 'chat', cor: 'teal', externo: true },
+    { botao: 'loja', href: comUtm(`${r}`, { utm_content: 'loja' }), titulo: `Loja ${nomeMarca}`, sub: 'Kits terapêuticos prontos para usar', icone: 'presente', cor: 'coral' },
+    { botao: 'newsletter', href: comUtm(`${r}#newsletter`, { utm_content: 'newsletter' }), titulo: 'Receber dicas por e-mail', sub: 'Cartas da Oficina, toda semana', icone: 'email', cor: 'sol' },
   ];
   const html = `<!doctype html>
 <html lang="pt-BR">
@@ -904,6 +921,7 @@ ${blocoSuporte(r, 'Ainda precisa de ajuda?')}`;
   .bio-link.destaque .ic { background: rgba(255,255,255,.16); color: #fff; }
   .bio-rodape { margin-top: 32px; font-size: 12.5px; color: var(--tinta-3); }
 </style>
+${rastreioHead({ utms: false })}
 </head>
 <body>
 <main class="bio">
@@ -911,7 +929,7 @@ ${blocoSuporte(r, 'Ainda precisa de ajuda?')}`;
   ${wordmark(r).replace(esc(cfg.assinatura), 'Arteterapia na Prática')}
   <p class="bio-desc">${esc(cfg.especialista)} · ${esc(cfg.especialistaTitulo)}. Ferramentas terapêuticas prontas para a sua prática.</p>
   <ul class="bio-links">
-    ${links.map((l) => `<li><a class="bio-link${l.destaque ? ' destaque' : ''}" href="${esc(l.href)}"${l.externo ? ' target="_blank" rel="noopener"' : ''}>
+    ${links.map((l) => `<li><a class="bio-link${l.destaque ? ' destaque' : ''}" href="${esc(l.href)}" data-botao="${l.botao}"${l.externo ? ' target="_blank" rel="noopener"' : ''}>
       <span class="ic ic-${l.cor}">${ic(l.icone)}</span>
       <span><strong>${esc(l.titulo)}</strong><small>${esc(l.sub)}</small></span>
       ${ic('seta', 'class="seta"')}
@@ -919,6 +937,21 @@ ${blocoSuporte(r, 'Ainda precisa de ajuda?')}`;
   </ul>
   <p class="bio-rodape">© ${new Date().getFullYear()} ${esc(nomeMarca)}</p>
 </main>
+<script>
+// Conta cliques de cada botão: evento "CliqueLinkBio" no pixel da Meta (via UTMify) + dataLayer
+document.querySelectorAll('.bio-link').forEach(function (a) {
+  a.addEventListener('click', function (e) {
+    var dados = { botao: a.dataset.botao };
+    (window.dataLayer = window.dataLayer || []).push(Object.assign({ event: 'clique_link_bio' }, dados));
+    if (window.fbq) window.fbq('trackCustom', 'CliqueLinkBio', dados);
+    // na mesma aba, segura a navegação um instante para o evento sair
+    if (a.target !== '_blank' && !e.metaKey && !e.ctrlKey) {
+      e.preventDefault();
+      setTimeout(function () { window.location.href = a.href; }, 250);
+    }
+  });
+});
+</script>
 </body>
 </html>`;
   pagina('links/index.html', html);
